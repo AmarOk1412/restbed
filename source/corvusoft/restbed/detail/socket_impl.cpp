@@ -61,6 +61,19 @@ namespace restbed
             , m_ssl_socket( nullptr )
 #endif
         {
+            // NOTE: this is a HACK until not moved in a good place
+            // i.e. settings (keep-alive) or function like the timeout
+            // Configure keep alive
+            uint32_t keepalive = 1;
+            setsockopt(m_socket->native_handle(), SOL_SOCKET, SO_KEEPALIVE, &keepalive, sizeof(uint32_t));
+            uint32_t keepAliveInterval = 30; // seconds
+            // First keep alive message after 30 seconds
+            setsockopt(m_socket->native_handle(), SOL_TCP, TCP_KEEPIDLE, &keepAliveInterval, sizeof(uint32_t));
+            // Then every 30 seconds
+            setsockopt(m_socket->native_handle(), SOL_TCP, TCP_KEEPINTVL, &keepAliveInterval, sizeof(uint32_t));
+            // Fail after one failure
+            uint32_t cnt = 1;
+            setsockopt(m_socket->native_handle(), SOL_TCP, TCP_KEEPCNT, &cnt, sizeof(uint32_t));
             return;
         }
 #ifdef BUILD_SSL
