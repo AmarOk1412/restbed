@@ -5,6 +5,10 @@
 //System Includes
 #include <future>
 #include <ciso646>
+#ifdef _WIN32
+#include <Ws2tcpip.h>
+#include <winsock2.h>
+#endif
 
 //Project Includes
 #include "corvusoft/restbed/logger.hpp"
@@ -264,6 +268,36 @@ namespace restbed
         void SocketImpl::set_timeout( const milliseconds& value )
         {
             m_timeout = value;
+        }
+
+        void SocketImpl::set_keep_alive( const uint32_t start, const uint32_t interval, const uint32_t cnt)
+        {
+#ifdef _WIN32
+            std::string val = "1";
+            setsockopt(m_socket->native_handle(), SOL_SOCKET, SO_KEEPALIVE, val.c_str(), sizeof(val));
+
+            std::string start_str = std::to_string(start);
+            std::string interval_str = std::to_string(interval);
+            std::string cnt_str = std::to_string(cnt);
+            setsockopt(m_socket->native_handle(), IPPROTO_TCP, TCP_KEEPIDLE,
+                       start_str.c_str(), sizeof(start_str));
+            setsockopt(m_socket->native_handle(), IPPROTO_TCP, TCP_KEEPINTVL,
+                       interval_str.c_str(), sizeof(interval_str));
+            setsockopt(m_socket->native_handle(), IPPROTO_TCP, TCP_KEEPCNT,
+                       cnt_str.c_str(), sizeof(cnt_str));
+#else
+            uint32_t val = 1;
+            setsockopt(m_socket->native_handle(), SOL_SOCKET, SO_KEEPALIVE, &val, sizeof(uint32_t));
+
+#ifdef __APPLE__
+            // Apple devices only have one parameter
+            setsockopt(m_socket->native_handle(), IPPROTO_TCP, TCP_KEEPALIVE, &start, sizeof(uint32_t));
+#else
+            setsockopt(m_socket->native_handle(), SOL_TCP, TCP_KEEPIDLE, &start, sizeof(uint32_t));
+            setsockopt(m_socket->native_handle(), SOL_TCP, TCP_KEEPINTVL, &interval, sizeof(uint32_t));
+            setsockopt(m_socket->native_handle(), SOL_TCP, TCP_KEEPCNT, &cnt, sizeof(uint32_t));
+#endif
+#endif
         }
         
         void SocketImpl::connection_timeout_handler( const shared_ptr< SocketImpl > socket, const error_code& error )
